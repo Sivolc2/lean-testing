@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lagrange Point Simulator — Ceres↔Mars Trajectory</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="canvas-container">
+  <canvas id="simCanvas"></canvas>
+
+  <div id="hud">
+
+    <!-- Top bar -->
+    <div id="top-bar">
+      <span id="sim-title">SOLAR SYS SIM</span>
+      <span id="time-display">T+0y 000d</span>
+      <span class="hud-separator">|</span>
+      <button id="play-btn" class="hud-btn">⏸ PAUSE</button>
+      <div id="speed-control">
+        <span style="color:#668877;font-size:11px">SPD</span>
+        <input type="range" id="speed-slider" min="0" max="100" value="33" step="1">
+        <span id="speed-label">10x</span>
+      </div>
+      <span class="hud-separator">|</span>
+      <button id="log-scale-btn" class="hud-btn" title="Toggle logarithmic scale for outer planets">LOG SCALE</button>
+      <span id="follow-display"></span>
+    </div>
+
+    <!-- Body info panel (right) -->
+    <div id="info-panel">
+      <h3 id="info-body-name">BODY</h3>
+      <div class="info-row">
+        <span class="info-label">Mass</span>
+        <span class="info-value" id="info-mass">--</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Dist from Sun</span>
+        <span class="info-value" id="info-dist">-- AU</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Orbital Period</span>
+        <span class="info-value" id="info-period">-- d</span>
+      </div>
+      <div style="margin-top:6px;color:#446655;font-size:10px">Click body to follow</div>
+    </div>
+
+    <!-- Ship info panel (left) -->
+    <div id="ship-panel">
+      <h3>SHIP STATUS</h3>
+      <div id="ship-phase-display">--</div>
+      <div id="ship-eta" style="color:#668899;font-size:11px;margin-top:4px">ETA: --</div>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip"></div>
+
+    <!-- Scale display -->
+    <div id="scale-display"></div>
+
+    <!-- Bottom bar: scrub + events -->
+    <div id="bottom-bar">
+      <div id="scrub-container">
+        <span style="color:#446655;font-size:11px">TIME</span>
+        <input type="range" id="scrub-slider" min="0" max="1000" value="0" step="1">
+        <span id="scrub-label" style="color:#446655;font-size:11px">scrub</span>
+      </div>
+      <div id="event-buttons">
+        <button class="hud-btn event-btn" id="btn-depart">⟶ DEPART CERES</button>
+        <button class="hud-btn event-btn" id="btn-arrive-mars">⟶ ARRIVE MARS</button>
+        <button class="hud-btn event-btn" id="btn-depart-mars">⟶ DEPART MARS</button>
+        <button class="hud-btn event-btn" id="btn-arrive-ceres">⟶ ARRIVE CERES</button>
+      </div>
+    </div>
+
+  </div><!-- #hud -->
+
+  <!-- Loading overlay -->
+  <div id="loading">
+    LOADING TRAJECTORY DATA
+    <div id="loading-bar"></div>
+  </div>
+
+</div><!-- #canvas-container -->
+
+<script src="sim.js"></script>
+</body>
+</html>
