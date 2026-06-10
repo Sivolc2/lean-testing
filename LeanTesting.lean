@@ -7,4 +7,10 @@ import LeanTesting.Forces
 import LeanTesting.RK4
 import LeanTesting.SolarSystem
 import LeanTesting.Transfer
+import LeanTesting.Json
+import LeanTesting.Config
+import LeanTesting.Orbit
+import LeanTesting.Brachistochrone
+import LeanTesting.Hohmann
+import LeanTesting.Mission
 import LeanTesting.Export

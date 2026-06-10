@@ -1,0 +1,13 @@
+{
+  "name": "epstein-drive-visualizer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Frontend + Playwright tests for the Lean Epstein-drive transit simulator",
+  "scripts": {
+    "test": "playwright test",
+    "serve": "npx http-server visualizer -p 8080 -c-1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0"
+  }
+}
