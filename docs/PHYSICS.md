@@ -4,6 +4,12 @@ Everything the visualizer shows is computed by the Lean program (`LeanTesting/`)
 and validated by `lake exe tests` (38 assertions). This page is your cheat sheet
 for the talk: the equations, the approximations, and the numbers to quote.
 
+Deeper companion pages: [`ORBITAL_MECHANICS.md`](ORBITAL_MECHANICS.md) (the
+long-form page — Hohmann transfers in depth, Lagrange points, launch windows,
+Oberth effect) and [`EPSTEIN_DRIVE.md`](EPSTEIN_DRIVE.md) (candidate drive
+specs — exhaust velocity, Isp, power — and how each value flows through the
+Lean code into the simulator).
+
 ---
 
 ## 1. The one idea: constant thrust changes everything
@@ -67,8 +73,10 @@ window — leave whenever you like.
 | **Earth → Jupiter** | ~2.7 years | ~6 days | ~158× |
 | **Ceres → Saturn** *(the Canterbury's ice run, S1E1)* | **~7.7 years** | **~8 days** | **~349×** |
 
-At a 3 g "hard burn," Ceres→Saturn drops to **~4 days**. (The catalog prints the
-full table every run; tweak `config/missions.json` and re-run to change it.)
+At a 3 g "hard burn," Ceres→Saturn drops to **~4 days**; the 5 g combat burn
+does Earth→Mars in **under 44 hours** and crosses **2.5% of light speed** at the
+flip. (The catalog prints the full table every run; tweak `config/missions.json`
+and re-run to change it.)
 
 The famous **259-day Earth→Mars** figure is a great anchor: that's a real NASA
 number, and the sim reproduces it from first principles (258.8 d) — then shows

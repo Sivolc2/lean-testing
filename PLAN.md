@@ -67,9 +67,22 @@ assertions (`lake exe tests`) and Playwright (`npx playwright test`).
 - [x] Tests: math panel independently reproduces the Lean transit numbers in-browser;
       tooltips exist, are substantive, and appear on hover (20 Playwright total)
 
-## Status: ✅ 38 Lean tests + 20 Playwright tests green; catalog generates in <1 s.
+## Phase 9 — Deep-dive docs + 5 g combat burn  ✅
+- [x] `docs/ORBITAL_MECHANICS.md` — full-page tour: Hohmann transfers in depth
+      (vis-viva, launch windows/synodic period, Oberth, bi-elliptic, gravity
+      assists) + Lagrange points (L1–L5, stability, Hill radius, Trojans, JWST)
+- [x] `docs/EPSTEIN_DRIVE.md` — candidate drive values (accel tiers, exhaust
+      velocity 1.5–4% c, Isp ~10⁶ s, ~24 TW jet power via the rocket equation)
+      and the config→Lean→visualizer data flow, with file links
+- [x] `config/missions.json`: new **Epstein 5 g combat burn** drive
+      (5 routes × 5 drives = 25 missions; Earth→Mars in 43.6 h, 2.5% c at flip)
+- [x] Playwright test 21: ep5 present, fastest on every route, obeys the
+      t ∝ 1/√a scaling law, telemetry crosses ~2.5% c at the flip; screenshot
+
+## Status: ✅ 38 Lean tests + 21 Playwright tests green; catalog (25 missions) generates in <1 s.
 
 ## Stretch (post-talk)
 - Keplerian eccentricity/inclination for planet rendering
-- Round-trip missions; Lagrange points / Trojans
+- Round-trip missions; render Lagrange points / Trojans in the visualizer
+  (covered in prose in `docs/ORBITAL_MECHANICS.md`)
 - Relativistic correction note for the highest-g burns

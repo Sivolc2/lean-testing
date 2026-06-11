@@ -375,4 +375,47 @@ test.describe('Revamp features', () => {
     await page.screenshot({ path: path.join(__dirname, 'screenshot-tooltip.png') });
   });
 
+  test('21. 5g combat burn: present, fastest, and obeys t ∝ 1/√a scaling', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+
+    // the new drive made it from config/missions.json into the UI
+    const btn = page.locator('.drive-btn[data-drive="ep5"]');
+    await expect(btn).toHaveCount(1);
+    await expect(btn).toContainText('5g');
+
+    // for every route: 5g is the fastest drive, and t(5g)/t(1g) ≈ √(1/5)
+    const checks = await page.evaluate(() => {
+      const ms = window._sim.data.missions;
+      const routes = [...new Set(ms.map(m => m.route))];
+      return routes.map(route => {
+        const of = id => ms.find(m => m.route === route && m.driveId === id);
+        const m5 = of('ep5'), m1 = of('ep1');
+        const fastest = Math.min(...ms.filter(m => m.route === route).map(m => m.transitDays));
+        return { route, t5: m5.transitDays, t1: m1.transitDays, fastest, accel5: m5.accelG };
+      });
+    });
+    for (const c of checks) {
+      expect(c.accel5).toBe(5);
+      expect(c.t5).toBe(c.fastest);
+      // brachistochrone scaling law: t = 2√(d/a) ⇒ t1/t5 ≈ √5 (loose tolerance:
+      // the intercept point moves with transit time, so d differs slightly)
+      expect(c.t1 / c.t5).toBeGreaterThan(Math.sqrt(5) * 0.9);
+      expect(c.t1 / c.t5).toBeLessThan(Math.sqrt(5) * 1.1);
+    }
+
+    // fly it and grab the visual: Ceres→Saturn at 5g near the flip
+    await page.locator('.route-btn[data-route="Ceres→Saturn"]').click();
+    await btn.click();
+    await page.locator('#play-btn').click(); // pause
+    await page.locator('#scrub-slider').evaluate(el => {
+      el.value = Math.floor(el.max * 0.5); el.dispatchEvent(new Event('input'));
+    });
+    await page.waitForTimeout(250);
+    // telemetry should show the headline number: ≈2.5% of light speed at the flip
+    const pctC = await page.evaluate(() => window._sim.telemetry.pctC);
+    expect(pctC).toBeGreaterThan(2.0);
+    expect(pctC).toBeLessThan(3.0);
+    await page.screenshot({ path: path.join(__dirname, 'screenshot-5g-burn.png') });
+  });
+
 });

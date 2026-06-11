@@ -33,7 +33,13 @@ the chemical baseline crawling while the Epstein ship arrives.
   Every approximation is documented and test-justified.
 
 See **[docs/PHYSICS.md](docs/PHYSICS.md)** for the equations, the approximations,
-and the full numbers table — the presenter cheat sheet.
+and the full numbers table — the presenter cheat sheet. For the deep dives:
+**[docs/ORBITAL_MECHANICS.md](docs/ORBITAL_MECHANICS.md)** (Hohmann transfers in
+depth, Lagrange points, launch windows, gravity assists) and
+**[docs/EPSTEIN_DRIVE.md](docs/EPSTEIN_DRIVE.md)** (candidate drive specs —
+exhaust velocity, Isp, terawatt jet power — and how `accelG` flows from
+`config/missions.json` through the Lean code into every pixel the visualizer
+draws).
 
 ## Visualizer features
 
