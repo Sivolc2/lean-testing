@@ -43,7 +43,7 @@ assertions (`lake exe tests`) and Playwright (`npx playwright test`).
 - [x] `package.json` (+ `@playwright/test`); screenshot review
 
 ## Phase 6 — Docs  ✅
-- [x] `docs/PHYSICS.md` — equations, approximations, validated numbers (presenter cheat sheet)
+- [x] `visualizer/docs/PHYSICS.md` — equations, approximations, validated numbers (presenter cheat sheet)
 - [x] `README.md`, this checklist
 
 ---
@@ -68,10 +68,10 @@ assertions (`lake exe tests`) and Playwright (`npx playwright test`).
       tooltips exist, are substantive, and appear on hover (20 Playwright total)
 
 ## Phase 9 — Deep-dive docs + 5 g combat burn  ✅
-- [x] `docs/ORBITAL_MECHANICS.md` — full-page tour: Hohmann transfers in depth
+- [x] `visualizer/docs/ORBITAL_MECHANICS.md` — full-page tour: Hohmann transfers in depth
       (vis-viva, launch windows/synodic period, Oberth, bi-elliptic, gravity
       assists) + Lagrange points (L1–L5, stability, Hill radius, Trojans, JWST)
-- [x] `docs/EPSTEIN_DRIVE.md` — candidate drive values (accel tiers, exhaust
+- [x] `visualizer/docs/EPSTEIN_DRIVE.md` — candidate drive values (accel tiers, exhaust
       velocity 1.5–4% c, Isp ~10⁶ s, ~24 TW jet power via the rocket equation)
       and the config→Lean→visualizer data flow, with file links
 - [x] `config/missions.json`: new **Epstein 5 g combat burn** drive
@@ -79,10 +79,24 @@ assertions (`lake exe tests`) and Playwright (`npx playwright test`).
 - [x] Playwright test 21: ep5 present, fastest on every route, obeys the
       t ∝ 1/√a scaling law, telemetry crosses ~2.5% c at the flip; screenshot
 
-## Status: ✅ 38 Lean tests + 21 Playwright tests green; catalog (25 missions) generates in <1 s.
+## Phase 10 — Public deploy for the event  ✅
+- [x] `vercel.json` — serve `visualizer/` as a static site (no install/build);
+      import of `main` on Vercel deploys as-is
+- [x] `visualizer/docs.html` — in-app rendered docs (Expanse-styled tabs:
+      cheat sheet / orbital mechanics / Epstein drive) with vendored
+      `marked.min.js` (no CDN dependency at the venue); `.md` links become tab
+      switches, source links point to GitHub
+- [x] Docs moved to `visualizer/docs/` so the deploy serves them (single source)
+- [x] **📖 THE PHYSICS** button in the sim's top bar; presenter-flow strip
+      (1 run the sim ▸ 2 numbers/equations ▸ 3 more missions, press C)
+- [x] README: deployment + presentation-flow sections
+- [x] Playwright test 22: docs reachable from sim, all three pages render,
+      GitHub link rewriting, back-link returns to the sim; screenshot
+
+## Status: ✅ 38 Lean tests + 22 Playwright tests green; catalog (25 missions) generates in <1 s.
 
 ## Stretch (post-talk)
 - Keplerian eccentricity/inclination for planet rendering
 - Round-trip missions; render Lagrange points / Trojans in the visualizer
-  (covered in prose in `docs/ORBITAL_MECHANICS.md`)
+  (covered in prose in `visualizer/docs/ORBITAL_MECHANICS.md`)
 - Relativistic correction note for the highest-g burns

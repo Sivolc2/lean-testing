@@ -418,4 +418,41 @@ test.describe('Revamp features', () => {
     await page.screenshot({ path: path.join(__dirname, 'screenshot-5g-burn.png') });
   });
 
+  test('22. docs page: reachable from the sim, renders all three write-ups', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+
+    // top bar links to the physics write-ups
+    const btn = page.locator('#docs-btn');
+    await expect(btn).toHaveCount(1);
+    expect(await btn.getAttribute('href')).toBe('docs.html');
+
+    // cheat sheet loads by default and is rendered (not raw markdown)
+    await page.goto(URL + 'docs.html');
+    await expect(page.locator('#doc-content h1')).toContainText('Physics Behind the Sim');
+
+    // presenter flow strip shows the 1-2-3 of the talk
+    await expect(page.locator('#flow')).toContainText('RUN THE SIM');
+    await expect(page.locator('#flow')).toContainText('THE NUMBERS');
+    await expect(page.locator('#flow')).toContainText('MORE MISSIONS');
+
+    // tab: orbital mechanics (Lagrange points + Hohmann)
+    await page.locator('#tab-orbital').click();
+    await expect(page.locator('#doc-content')).toContainText('Lagrange');
+    await expect(page.locator('#doc-content')).toContainText('Hohmann');
+
+    // tab: Epstein drive values; repo source links rewritten to GitHub
+    await page.locator('#tab-drive').click();
+    await expect(page.locator('#doc-content')).toContainText('accelG');
+    await expect(page.locator('#doc-content')).toContainText('exhaust velocity', { ignoreCase: true });
+    const ghLinks = await page.locator('#doc-content a[href*="github.com"]').count();
+    expect(ghLinks).toBeGreaterThan(3);
+
+    await page.screenshot({ path: path.join(__dirname, 'screenshot-docs.png') });
+
+    // back link returns to the sim
+    await page.locator('a:has-text("BACK TO SIM")').click();
+    await waitLoaded(page);
+    await expect(page.locator('#sim-title')).toContainText('TRANSIT SIM');
+  });
+
 });

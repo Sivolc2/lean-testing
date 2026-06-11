@@ -15,7 +15,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #01030a; }
   position: absolute; inset: 0; pointer-events: none;
   font-family: "Courier New", Courier, monospace; color: #9fd8c8;
 }
-#hud button, #hud input, #hud .pick-btn, #hud .tip { pointer-events: auto; }
+#hud button, #hud input, #hud .pick-btn, #hud .tip, #hud a.hud-btn { pointer-events: auto; }
+a.hud-btn { text-decoration: none; display: inline-block; }
 #numbers-panel { pointer-events: auto; }
 
 .dim { color: #557066; font-size: 11px; }

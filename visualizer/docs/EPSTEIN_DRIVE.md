@@ -13,17 +13,17 @@ enters the simulator.
 ## 1. The one knob the simulator exposes: `accelG`
 
 In this sim a drive **is** its sustained acceleration. Each entry in
-[`config/missions.json`](../config/missions.json) is just
+[`config/missions.json`](../../config/missions.json) is just
 `{ id, label, accelG }`, and the value flows:
 
 | Step | Where | What happens |
 |---|---|---|
 | 1. Config | `config/missions.json` | `"accelG": 5.0` |
-| 2. Parse | [`LeanTesting/Config.lean`](../LeanTesting/Config.lean) | → `DriveSpec.accelG : Float` |
-| 3. To SI | [`LeanTesting/Mission.lean:93`](../LeanTesting/Mission.lean) | `a := drive.accelG * gEarth` (9.80665 m/s²) |
-| 4. Physics | [`LeanTesting/Brachistochrone.lean:21-24`](../LeanTesting/Brachistochrone.lean) | `t = 2·√(d/a)`, `v_peak = √(a·d)`; intercept solved at line 43 |
-| 5. Export | [`LeanTesting/Export.lean`](../LeanTesting/Export.lean) | → `visualizer/trajectory.json` (frames + headline numbers) |
-| 6. Render | [`visualizer/sim.js`](../visualizer/sim.js) | new picker button, catalog row, race-strip lane, telemetry |
+| 2. Parse | [`LeanTesting/Config.lean`](../../LeanTesting/Config.lean) | → `DriveSpec.accelG : Float` |
+| 3. To SI | [`LeanTesting/Mission.lean:93`](../../LeanTesting/Mission.lean) | `a := drive.accelG * gEarth` (9.80665 m/s²) |
+| 4. Physics | [`LeanTesting/Brachistochrone.lean:21-24`](../../LeanTesting/Brachistochrone.lean) | `t = 2·√(d/a)`, `v_peak = √(a·d)`; intercept solved at line 43 |
+| 5. Export | [`LeanTesting/Export.lean`](../../LeanTesting/Export.lean) | → `visualizer/trajectory.json` (frames + headline numbers) |
+| 6. Render | [`visualizer/sim.js`](../../visualizer/sim.js) | new picker button, catalog row, race-strip lane, telemetry |
 
 So adding a drive is a one-line config edit plus `lake exe lean-testing` — no
 Lean changes. The two formulas in step 4 give the scaling law worth memorizing:
