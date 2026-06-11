@@ -3,44 +3,48 @@
 // ── Constants ──────────────────────────────────────────────────────────────
 const AU = 1.495978707e11;
 const SEC_PER_DAY = 86400;
-const SEC_PER_YEAR = 365.25 * SEC_PER_DAY;
+const C_KMS = 299792.458;          // speed of light, km/s
 
 // Visual config keyed by body name (data drives the rest).
 const BODY_STYLE = {
-  Sun:     { color: '#ffd966', glow: '#ffcc00', r: 13 },
-  Mercury: { color: '#aaaaaa', glow: '#888888', r: 4 },
-  Venus:   { color: '#ffe888', glow: '#ffcc44', r: 6 },
+  Sun:     { color: '#ffd966', glow: '#ffcc00', r: 14 },
+  Mercury: { color: '#aaaaaa', glow: '#888888', r: 3.5 },
+  Venus:   { color: '#ffe888', glow: '#ffcc44', r: 5.5 },
   Earth:   { color: '#4488ff', glow: '#2266cc', r: 6 },
   Mars:    { color: '#ff5522', glow: '#cc2200', r: 5 },
   Jupiter: { color: '#d4a87a', glow: '#b08050', r: 10 },
   Saturn:  { color: '#e8d090', glow: '#c8a860', r: 9, ring: true },
   Uranus:  { color: '#80d8d8', glow: '#44aaaa', r: 7 },
   Neptune: { color: '#5566ff', glow: '#3344cc', r: 7 },
-  Ceres:   { color: '#bbbbbb', glow: '#777777', r: 4 },
+  Ceres:   { color: '#c8b8a8', glow: '#887766', r: 4 },
 };
-const TRAIL_LEN = 160;
-const SHIP_TRAIL_LEN = 220;
-const STAR_COUNT = 500;
+const PHASE_COLORS = { accel: '#ffb060', flip: '#ff66cc', decel: '#66c0ff', coast: '#48685c' };
+const PHASE_LABELS = { accel: 'ACCELERATING ▲', flip: 'FLIP & BURN ⟲', decel: 'DECELERATING ▼', coast: 'COASTING ···' };
 
 // ── State ──────────────────────────────────────────────────────────────────
 window._sim = { data: null, mission: null, displayed: {} };
 let data = null;
-let routes = [];           // [{from,to,label}]
-let mission = null;        // current mission object
-let frames = [];           // mission.frames
+let routes = [];            // [{from,to,label}]
+let mission = null;         // current mission object
+let frames = [];            // mission.frames
+let frameFloat = 0;         // fractional playback position
 let frameIdx = 0;
 let playing = true;
-let speed = 10;
-let selRoute = null;       // "From→To"
-let selDrive = null;       // driveId
+let speed = 10;             // frames advanced per second of wall clock
+let lastTick = null;
+let selRoute = null;        // "From→To"
+let selDrive = null;        // driveId
 let zoom = 1.0;
 let panX = 0, panY = 0;
 let isDragging = false, dragSX = 0, dragSY = 0, dragPX = 0, dragPY = 0;
-let followBody = -1;
-let stars = [];
+let followTarget = null;    // null | {type:'body', idx} | {type:'ship'}
+let scrubbing = false;
+let starsFar = [], starsNear = [];
 let canvas, ctx;
-let trails = [], shipTrail = [];
 let bodyNames = [];
+let cumDist = [];           // cumulative ship path length per frame (m)
+let totalDist = 0;
+let chemBaseline = null;    // chemical mission for the current route
 
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -59,11 +63,15 @@ function resizeCanvas() {
 }
 
 function generateStars() {
-  stars = [];
-  for (let i = 0; i < STAR_COUNT; i++) {
-    stars.push({ x: Math.random() * 4000 - 2000, y: Math.random() * 4000 - 2000,
-                 r: Math.random() * 1.2 + 0.3, a: Math.random() * 0.6 + 0.2 });
-  }
+  const mk = (n, rMin, rMax) => Array.from({ length: n }, () => ({
+    x: Math.random() * 4000 - 2000, y: Math.random() * 4000 - 2000,
+    r: rMin + Math.random() * (rMax - rMin),
+    a: Math.random() * 0.5 + 0.18,
+    tw: Math.random() * Math.PI * 2,          // twinkle phase
+    ts: 0.4 + Math.random() * 1.6,            // twinkle speed
+  }));
+  starsFar = mk(320, 0.3, 0.9);
+  starsNear = mk(180, 0.7, 1.6);
 }
 
 function loadData() {
@@ -75,11 +83,12 @@ function loadData() {
       bodyNames = d.bodies.map(b => b.name);
       buildRouteList();
       buildPickers();
+      buildCatalog();
       // default selection: Ceres→Saturn (the Canterbury) on Epstein 1g, else first
       const def = d.missions.find(m => m.id === 'Ceres-Saturn-ep1') || d.missions[0];
       selectMission(def);
       document.getElementById('loading').style.display = 'none';
-      animate();
+      requestAnimationFrame(animate);
     })
     .catch(e => {
       document.getElementById('loading').innerHTML =
@@ -132,12 +141,29 @@ function selectMission(m) {
   mission = m;
   window._sim.mission = m;
   frames = m.frames;
+  frameFloat = 0;
   frameIdx = 0;
   selRoute = m.from + '→' + m.to;
   selDrive = m.driveId;
-  trails = bodyNames.map(() => []);
-  shipTrail = [];
+  chemBaseline = data.missions.find(x => x.from === m.from && x.to === m.to && x.isHohmann) || null;
+
+  // Precompute the ship's cumulative path length (for the telemetry panel).
+  cumDist = new Array(frames.length);
+  cumDist[0] = 0;
+  for (let i = 1; i < frames.length; i++) {
+    const a = frames[i - 1].shipPos, b = frames[i].shipPos;
+    cumDist[i] = cumDist[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+  totalDist = cumDist[frames.length - 1];
+
+  const scrub = document.getElementById('scrub-slider');
+  scrub.max = frames.length - 1;
+  scrub.value = 0;
+
   highlightPickers();
+  highlightCatalogRow();
+  buildPhaseStrip();
+  updateRaceLabels();
   autoFit();
   updateNumbers();
 }
@@ -162,10 +188,29 @@ function autoFit() {
     maxR = Math.max(maxR, Math.hypot(f.shipPos[0], f.shipPos[1]));
   }
   const extentAU = maxR / AU || 1;
-  const target = 0.40 * Math.min(canvas.width, canvas.height);
+  const target = 0.38 * Math.min(canvas.width, canvas.height);
   zoom = target / (extentAU * 90);
   panX = 0; panY = 0;
-  followBody = -1;
+  followTarget = null;
+  updateFollowBtn();
+}
+
+// ── Phase strip (colored timeline under the scrub bar) ──────────────────────
+function buildPhaseStrip() {
+  const el = document.getElementById('phase-strip');
+  const n = frames.length;
+  const stops = [];
+  let cur = frames[0].phase, start = 0;
+  for (let i = 1; i <= n; i++) {
+    const ph = i < n ? frames[i].phase : null;
+    if (ph !== cur) {
+      const a = (start / n * 100).toFixed(2), b = (i / n * 100).toFixed(2);
+      const c = PHASE_COLORS[cur] || '#48685c';
+      stops.push(`${c} ${a}%`, `${c} ${b}%`);
+      cur = ph; start = i;
+    }
+  }
+  el.style.background = `linear-gradient(90deg, ${stops.join(', ')})`;
 }
 
 // ── World ↔ screen ────────────────────────────────────────────────────────
@@ -180,42 +225,35 @@ function screenToWorld(sx, sy) {
 }
 
 // ── Animation ────────────────────────────────────────────────────────────────
-function animate() {
+function animate(now) {
   requestAnimationFrame(animate);
   if (!data || !mission) return;
-  if (playing) {
-    frameIdx = (frameIdx + Math.max(1, Math.round(speed))) % frames.length;
+  const dt = lastTick == null ? 0 : Math.min(0.1, (now - lastTick) / 1000);
+  lastTick = now;
+  if (playing && !scrubbing) {
+    frameFloat = (frameFloat + speed * dt) % frames.length;
+    frameIdx = Math.floor(frameFloat);
   }
-  updateTrails();
-  render();
+  render(now / 1000);
   updateHUD();
 }
 
-function updateTrails() {
+function render(tSec) {
   const f = frames[frameIdx];
-  for (let i = 0; i < bodyNames.length; i++) {
-    trails[i].push({ x: f.positions[i][0], y: f.positions[i][1] });
-    if (trails[i].length > TRAIL_LEN) trails[i].shift();
-  }
-  shipTrail.push({ x: f.shipPos[0], y: f.shipPos[1] });
-  if (shipTrail.length > SHIP_TRAIL_LEN) shipTrail.shift();
-}
-
-function render() {
-  const f = frames[frameIdx];
-  ctx.fillStyle = '#000007';
+  ctx.fillStyle = '#01030a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  renderStars();
+  renderStars(tSec);
 
-  if (followBody >= 0) {
-    const bp = f.positions[followBody];
+  if (followTarget) {
     const s = worldScale();
-    panX = -(bp[0] * s); panY = -(bp[1] * s);
+    const p = followTarget.type === 'ship' ? f.shipPos : f.positions[followTarget.idx];
+    panX = -(p[0] * s); panY = -(p[1] * s);
   }
 
-  for (let i = 0; i < bodyNames.length; i++)
-    renderTrail(trails[i], styleOf(i).color, 0.30, 1.3);
-  renderShipTrail(f);
+  renderOrbitGuides();
+  renderFuturePath();
+  renderTraveledPath();
+  renderRouteMarkers();
 
   for (let i = 0; i < bodyNames.length; i++)
     renderBody(i, f.positions[i]);
@@ -224,79 +262,194 @@ function render() {
 
 function styleOf(i) { return BODY_STYLE[bodyNames[i]] || { color: '#888', glow: '#444', r: 4 }; }
 
-function renderStars() {
-  for (const s of stars) {
-    const sx = (((s.x + panX * 0.05) % canvas.width) + canvas.width) % canvas.width;
-    const sy = (((s.y + panY * 0.05) % canvas.height) + canvas.height) % canvas.height;
-    ctx.globalAlpha = s.a; ctx.fillStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
+function renderStars(tSec) {
+  const layer = (stars, parallax) => {
+    for (const s of stars) {
+      const sx = (((s.x + panX * parallax) % canvas.width) + canvas.width) % canvas.width;
+      const sy = (((s.y + panY * parallax) % canvas.height) + canvas.height) % canvas.height;
+      ctx.globalAlpha = s.a * (0.72 + 0.28 * Math.sin(tSec * s.ts + s.tw));
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+  };
+  layer(starsFar, 0.03);
+  layer(starsNear, 0.08);
+  ctx.globalAlpha = 1;
+}
+
+// Faint circular guides for every body's orbit (the model is circular orbits).
+function renderOrbitGuides() {
+  const s = worldScale();
+  const c = worldToScreen(0, 0);
+  for (const b of data.bodies) {
+    if (!b.aAU) continue;
+    const st = BODY_STYLE[b.name] || { color: '#888888' };
+    const isEndpoint = b.name === mission.from || b.name === mission.to;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, b.aAU * AU * s, 0, Math.PI * 2);
+    ctx.strokeStyle = st.color;
+    ctx.globalAlpha = isEndpoint ? 0.30 : 0.10;
+    ctx.lineWidth = isEndpoint ? 1.2 : 0.8;
+    ctx.stroke();
   }
   ctx.globalAlpha = 1;
 }
 
-function renderTrail(trail, color, baseAlpha, width) {
-  if (trail.length < 2) return;
-  for (let i = 1; i < trail.length; i++) {
-    const p0 = worldToScreen(trail[i - 1].x, trail[i - 1].y);
-    const p1 = worldToScreen(trail[i].x, trail[i].y);
-    ctx.globalAlpha = baseAlpha * (i / trail.length);
-    ctx.strokeStyle = color; ctx.lineWidth = width;
+// The not-yet-flown remainder of the trajectory, as a faint dashed line.
+function renderFuturePath() {
+  if (frameIdx >= frames.length - 1) return;
+  ctx.save();
+  ctx.setLineDash([4, 7]);
+  ctx.strokeStyle = '#7fb8d8';
+  ctx.globalAlpha = 0.18;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const p0 = worldToScreen(frames[frameIdx].shipPos[0], frames[frameIdx].shipPos[1]);
+  ctx.moveTo(p0.x, p0.y);
+  for (let i = frameIdx + 1; i < frames.length; i++) {
+    const p = worldToScreen(frames[i].shipPos[0], frames[i].shipPos[1]);
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// The flown part of the trajectory, colored by drive phase, fading with age.
+function renderTraveledPath() {
+  if (frameIdx < 1) return;
+  for (let i = 1; i <= frameIdx; i++) {
+    const a = frames[i - 1].shipPos, b = frames[i].shipPos;
+    const p0 = worldToScreen(a[0], a[1]);
+    const p1 = worldToScreen(b[0], b[1]);
+    ctx.strokeStyle = PHASE_COLORS[frames[i].phase] || '#5577aa';
+    ctx.globalAlpha = 0.22 + 0.55 * (i / frameIdx);
+    ctx.lineWidth = 1.7;
     ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
   }
   ctx.globalAlpha = 1;
 }
 
-function renderShipTrail(f) {
-  const burning = f.phase === 'accel' || f.phase === 'decel' || f.phase === 'flip';
-  renderTrail(shipTrail, burning ? '#88ccff' : '#5577aa', 0.6, 1.8);
+// Departure ring, arrival/intercept ring, and the flip point (Epstein only).
+function renderRouteMarkers() {
+  const dep = frames[0].shipPos;
+  const arr = frames[frames.length - 1].shipPos;
+  const toColor = (BODY_STYLE[mission.to] || { color: '#9fd8c8' }).color;
+
+  let p = worldToScreen(dep[0], dep[1]);
+  ctx.save();
+  ctx.setLineDash([3, 4]);
+  ctx.strokeStyle = '#9fd8c8'; ctx.globalAlpha = 0.45; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI * 2); ctx.stroke();
+
+  p = worldToScreen(arr[0], arr[1]);
+  ctx.strokeStyle = toColor; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(p.x, p.y, 11, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = toColor; ctx.globalAlpha = 0.75;
+  ctx.font = '9px "Courier New", monospace';
+  ctx.fillText('INTERCEPT', p.x + 15, p.y + 17);
+  ctx.restore();
+
+  if (!mission.isHohmann) {
+    // flip point: the frame nearest mid-transit
+    const mid = frames[Math.floor(frames.length / 2)].shipPos;
+    p = worldToScreen(mid[0], mid[1]);
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(Math.PI / 4);
+    ctx.strokeStyle = PHASE_COLORS.flip; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.3;
+    ctx.strokeRect(-4, -4, 8, 8);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillStyle = PHASE_COLORS.flip;
+    ctx.font = '9px "Courier New", monospace';
+    ctx.fillText('FLIP', 8, -8);
+    ctx.restore();
+  }
 }
 
 function renderBody(idx, pos) {
   const st = styleOf(idx);
+  const name = bodyNames[idx];
   const { x, y } = worldToScreen(pos[0], pos[1]);
-  const grad = ctx.createRadialGradient(x, y, 0, x, y, st.r * 1.8);
-  grad.addColorStop(0, st.color + 'cc'); grad.addColorStop(0.4, st.color + '55'); grad.addColorStop(1, st.color + '00');
-  ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(x, y, st.r * 1.8, 0, Math.PI * 2); ctx.fill();
+  const isSun = name === 'Sun';
+  const glowR = st.r * (isSun ? 3.2 : 1.9);
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, glowR);
+  grad.addColorStop(0, st.color + (isSun ? 'ee' : 'cc'));
+  grad.addColorStop(0.4, st.color + '44');
+  grad.addColorStop(1, st.color + '00');
+  ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(x, y, glowR, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = st.color; ctx.beginPath(); ctx.arc(x, y, st.r, 0, Math.PI * 2); ctx.fill();
   if (st.ring) {
     ctx.save(); ctx.strokeStyle = '#c8a86088'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.ellipse(x, y, st.r * 2.4, st.r * 0.7, 0.3, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
   }
-  // Label endpoints + Sun
-  const name = bodyNames[idx];
-  if (name === 'Sun' || name === mission.from || name === mission.to) {
-    ctx.fillStyle = st.color + 'dd'; ctx.font = '11px "Courier New", monospace';
-    ctx.fillText(name, x + st.r + 4, y - 4);
+
+  // Labels: endpoints + Sun always and bright; others small, and only when
+  // they aren't crowded against the Sun at the current zoom.
+  const isEndpoint = name === mission.from || name === mission.to;
+  if (isEndpoint || isSun) {
+    ctx.fillStyle = st.color + 'ee';
+    ctx.font = 'bold 11px "Courier New", monospace';
+    ctx.fillText(name, x + st.r + 5, y - 5);
+  } else {
+    const sun = worldToScreen(0, 0);
+    if (Math.hypot(x - sun.x, y - sun.y) > 55) {
+      ctx.fillStyle = st.color + '77';
+      ctx.font = '10px "Courier New", monospace';
+      ctx.fillText(name, x + st.r + 4, y - 4);
+    }
   }
 }
 
 function renderShip(f) {
   const { x, y } = worldToScreen(f.shipPos[0], f.shipPos[1]);
   const burning = f.phase === 'accel' || f.phase === 'decel' || f.phase === 'flip';
+  const flipped = f.phase === 'decel';
+
+  // Heading from the local velocity vector (frame-to-frame difference).
+  const i0 = Math.min(frameIdx, frames.length - 2);
+  const a = frames[i0].shipPos, b = frames[i0 + 1].shipPos;
+  let velAngle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+  if (b[0] === a[0] && b[1] === a[1]) velAngle = 0;
+  const heading = velAngle + (flipped ? Math.PI : 0);   // nose direction
+
   if (burning) {
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, 16);
-    grad.addColorStop(0, 'rgba(120,190,255,0.85)');
-    grad.addColorStop(0.5, 'rgba(60,110,255,0.30)');
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, 17);
+    grad.addColorStop(0, 'rgba(130,200,255,0.75)');
+    grad.addColorStop(0.5, 'rgba(60,110,255,0.25)');
     grad.addColorStop(1, 'rgba(0,50,255,0)');
-    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(x, y, 17, 0, Math.PI * 2); ctx.fill();
   }
-  // heading from trail
-  let angle = 0;
-  if (shipTrail.length >= 2) {
-    const a = shipTrail[shipTrail.length - 1], b = shipTrail[shipTrail.length - 2];
-    angle = Math.atan2(a.y - b.y, a.x - b.x) - Math.PI / 2;
-    // during decel the ship has flipped — point thruster forward
-    if (f.phase === 'decel') angle += Math.PI;
-  }
+
   const size = 7;
-  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
-  ctx.fillStyle = burning ? '#aad4ff' : '#5588cc';
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(heading + Math.PI / 2);   // triangle nose points local -y
+
+  // Exhaust plume out the back (during burns), flickering slightly.
+  if (burning) {
+    const flick = 1 + 0.25 * Math.sin(performance.now() / 42);
+    const plume = size * 2.6 * flick;
+    const pg = ctx.createLinearGradient(0, size, 0, size + plume);
+    pg.addColorStop(0, 'rgba(170,220,255,0.95)');
+    pg.addColorStop(0.4, 'rgba(90,150,255,0.55)');
+    pg.addColorStop(1, 'rgba(40,80,255,0)');
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.38, size * 0.7);
+    ctx.lineTo(size * 0.38, size * 0.7);
+    ctx.lineTo(0, size * 0.7 + plume);
+    ctx.closePath(); ctx.fill();
+  }
+
+  ctx.fillStyle = burning ? '#cfe8ff' : '#5588cc';
   ctx.strokeStyle = burning ? '#ffffff' : '#88aacc'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, -size); ctx.lineTo(size * 0.6, size * 0.7);
   ctx.lineTo(-size * 0.6, size * 0.7); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-  ctx.fillStyle = burning ? '#aaddff' : '#6688aa'; ctx.font = '10px "Courier New", monospace';
-  ctx.fillText('SHIP', x + 9, y - 5);
+
+  ctx.fillStyle = burning ? '#aaddff' : '#6688aa';
+  ctx.font = '10px "Courier New", monospace';
+  ctx.fillText('SHIP', x + 10, y + 16);   // below-right, clear of planet labels
 }
 
 // ── HUD / numbers ────────────────────────────────────────────────────────────
@@ -304,6 +457,20 @@ function fmtTime(days) {
   if (days < 2) return (days * 24).toFixed(1) + ' h';
   if (days < 400) return Math.round(days) + ' days';
   return (days / 365.25).toFixed(2) + ' yr';
+}
+
+function fmtAU(meters) {
+  const au = meters / AU;
+  return (au < 0.1 ? au.toFixed(3) : au.toFixed(2)) + ' AU';
+}
+
+// Ship speed at frame i (km/s) via central difference over the exported frames.
+function velAtFrame(i) {
+  const j0 = Math.max(0, i - 1), j1 = Math.min(frames.length - 1, i + 1);
+  const a = frames[j0].shipPos, b = frames[j1].shipPos;
+  const dt = frames[j1].t - frames[j0].t;
+  if (dt <= 0) return 0;
+  return Math.hypot(b[0] - a[0], b[1] - a[1]) / dt / 1000;
 }
 
 function updateNumbers() {
@@ -333,32 +500,148 @@ function updateNumbers() {
   };
 }
 
+function updateTelemetry() {
+  const v = velAtFrame(frameIdx);
+  document.getElementById('np-curv').textContent =
+    (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1)) + ' km/s';
+  const pc = v / C_KMS * 100;
+  document.getElementById('np-lightc').textContent =
+    pc >= 0.01 ? pc.toFixed(2) + '% c' : '<0.01% c';
+  document.getElementById('np-dist').textContent = fmtAU(cumDist[frameIdx]);
+  document.getElementById('np-remain').textContent = fmtAU(Math.max(0, totalDist - cumDist[frameIdx]));
+  window._sim.telemetry = { velKms: v, pctC: pc, traveledM: cumDist[frameIdx], totalM: totalDist };
+}
+
+// ── Same-clock race strip ────────────────────────────────────────────────────
+function updateRaceLabels() {
+  const strip = document.getElementById('race-strip');
+  if (mission.isHohmann || !chemBaseline) {
+    strip.style.display = 'none';
+    return;
+  }
+  strip.style.display = 'flex';
+  document.getElementById('race-ship-name').textContent =
+    ('THIS SHIP (' + mission.driveLabel + ')').toUpperCase();
+}
+
+function updateRace() {
+  if (mission.isHohmann || !chemBaseline) return;
+  const elapsed = frames[frameIdx].t / SEC_PER_DAY;
+  const epP = Math.min(1, elapsed / mission.transitDays);
+  const chP = Math.min(1, elapsed / chemBaseline.transitDays);
+  document.getElementById('race-ep-fill').style.width = (epP * 100).toFixed(1) + '%';
+  document.getElementById('race-chem-fill').style.width = Math.max(chP * 100, 0.4).toFixed(2) + '%';
+  document.getElementById('race-ep-pct').textContent =
+    epP >= 1 ? 'ARRIVED · ' + fmtTime(mission.transitDays) : (epP * 100).toFixed(0) + '%';
+  document.getElementById('race-chem-pct').textContent =
+    (chP * 100).toFixed(1) + '% of ' + fmtTime(chemBaseline.transitDays);
+}
+
 function updateHUD() {
   const f = frames[frameIdx];
   const elapsedDays = f.t / SEC_PER_DAY;
   document.getElementById('time-display').textContent = 'T+' + fmtTime(elapsedDays);
   const remain = mission.transitDays - elapsedDays;
-  document.getElementById('eta-display').textContent = remain > 0 ? '  ETA ' + fmtTime(remain) : '  ARRIVED';
-  document.getElementById('scrub-slider').max = frames.length - 1;
-  document.getElementById('scrub-slider').value = frameIdx;
+  document.getElementById('eta-display').textContent =
+    remain > 0.005 * mission.transitDays ? '  ETA ' + fmtTime(remain) : '  ARRIVED';
+
+  if (playing && !scrubbing)
+    document.getElementById('scrub-slider').value = frameIdx;
 
   const phaseEl = document.getElementById('phase-indicator');
-  const labels = { accel: 'ACCELERATING ▲', flip: 'FLIP & BURN ⟲', decel: 'DECELERATING ▼', coast: 'COASTING ···' };
-  phaseEl.textContent = labels[f.phase] || f.phase.toUpperCase();
+  phaseEl.textContent = PHASE_LABELS[f.phase] || f.phase.toUpperCase();
   phaseEl.className = 'phase-' + f.phase;
+
+  updateTelemetry();
+  updateRace();
+}
+
+// ── Catalog overlay ──────────────────────────────────────────────────────────
+function buildCatalog() {
+  const tbody = document.getElementById('catalog-body');
+  tbody.innerHTML = '';
+  let lastRoute = null;
+  for (const m of data.missions) {
+    if (m.route !== lastRoute) {
+      lastRoute = m.route;
+      const tr = document.createElement('tr');
+      tr.className = 'route-head';
+      const td = document.createElement('td');
+      td.colSpan = 6;
+      td.textContent = m.from + ' → ' + m.to;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+    const tr = document.createElement('tr');
+    tr.dataset.missionId = m.id;
+    const cells = [
+      '', m.driveLabel, fmtTime(m.transitDays),
+      Math.round(m.peakVelKms).toLocaleString() + ' km/s',
+      m.isHohmann ? 'Δv ' + m.deltaVKms.toFixed(2) + ' km/s' : m.accelG + ' g',
+      m.isHohmann ? 'baseline' : Math.round(m.speedupFactor) + '× faster',
+    ];
+    cells.forEach((c, i) => {
+      const td = document.createElement('td');
+      td.textContent = c;
+      if (i === 2) td.className = 'cat-transit';
+      if (i === 5 && !m.isHohmann) td.className = 'cat-speedup';
+      tr.appendChild(td);
+    });
+    tr.addEventListener('click', () => { selectMission(m); toggleCatalog(false); });
+    tbody.appendChild(tr);
+  }
+}
+
+function highlightCatalogRow() {
+  document.querySelectorAll('#catalog-body tr[data-mission-id]').forEach(tr =>
+    tr.classList.toggle('current', tr.dataset.missionId === mission.id));
+}
+
+function toggleCatalog(show) {
+  const ov = document.getElementById('catalog-overlay');
+  const showing = show !== undefined ? show : ov.hidden;
+  ov.hidden = !showing;
+  document.getElementById('catalog-btn').classList.toggle('active', showing);
+  if (showing) highlightCatalogRow();
+}
+
+// ── Follow / view helpers ────────────────────────────────────────────────────
+function toggleFollowShip() {
+  followTarget = (followTarget && followTarget.type === 'ship') ? null : { type: 'ship' };
+  updateFollowBtn();
+}
+
+function updateFollowBtn() {
+  document.getElementById('follow-btn').classList.toggle(
+    'active', !!(followTarget && followTarget.type === 'ship'));
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 function setupControls() {
   document.getElementById('play-btn').addEventListener('click', togglePlay);
-  document.getElementById('speed-slider').addEventListener('input', e => {
-    speed = Math.max(1, Math.min(1000, Math.round(Math.pow(10, parseFloat(e.target.value) / 33.33))));
+  document.getElementById('follow-btn').addEventListener('click', toggleFollowShip);
+  document.getElementById('reset-view-btn').addEventListener('click', () => { if (mission) autoFit(); });
+  document.getElementById('catalog-btn').addEventListener('click', () => toggleCatalog());
+  document.getElementById('catalog-overlay').addEventListener('click', e => {
+    if (e.target.id === 'catalog-overlay') toggleCatalog(false);
+  });
+
+  const applySpeed = v => {
+    speed = Math.max(1, Math.min(1000, Math.round(Math.pow(10, v / 33.33))));
     document.getElementById('speed-label').textContent = speed + '×';
-  });
-  document.getElementById('scrub-slider').addEventListener('input', e => {
+  };
+  const speedSlider = document.getElementById('speed-slider');
+  speedSlider.addEventListener('input', e => applySpeed(parseFloat(e.target.value)));
+  applySpeed(parseFloat(speedSlider.value));
+
+  const scrub = document.getElementById('scrub-slider');
+  scrub.addEventListener('input', e => {
     frameIdx = parseInt(e.target.value);
-    trails = bodyNames.map(() => []); shipTrail = [];
+    frameFloat = frameIdx;
   });
+  scrub.addEventListener('pointerdown', () => { scrubbing = true; });
+  window.addEventListener('pointerup', () => { scrubbing = false; });
+
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     const before = screenToWorld(e.clientX, e.clientY);
@@ -371,7 +654,10 @@ function setupControls() {
   }, { passive: false });
   canvas.addEventListener('mousedown', e => { isDragging = true; dragSX = e.clientX; dragSY = e.clientY; dragPX = panX; dragPY = panY; });
   canvas.addEventListener('mousemove', e => {
-    if (isDragging) { panX = dragPX + (e.clientX - dragSX); panY = dragPY + (e.clientY - dragSY); followBody = -1; }
+    if (isDragging) {
+      panX = dragPX + (e.clientX - dragSX); panY = dragPY + (e.clientY - dragSY);
+      followTarget = null; updateFollowBtn();
+    }
   });
   canvas.addEventListener('mouseup', e => {
     if (!isDragging) return;
@@ -379,9 +665,30 @@ function setupControls() {
     if (Math.abs(e.clientX - dragSX) < 5 && Math.abs(e.clientY - dragSY) < 5) handleClick(e.clientX, e.clientY);
   });
   canvas.addEventListener('mouseleave', () => { isDragging = false; });
+
   window.addEventListener('keydown', e => {
-    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
-    if (e.code === 'Escape') followBody = -1;
+    if (!mission) return;
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault(); togglePlay(); break;
+      case 'ArrowLeft':
+      case 'ArrowRight': {
+        e.preventDefault();
+        if (playing) togglePlay();
+        const step = (e.shiftKey ? 10 : 1) * (e.code === 'ArrowRight' ? 1 : -1);
+        frameIdx = (frameIdx + step + frames.length) % frames.length;
+        frameFloat = frameIdx;
+        document.getElementById('scrub-slider').value = frameIdx;
+        break;
+      }
+      case 'KeyF': toggleFollowShip(); break;
+      case 'KeyR': autoFit(); break;
+      case 'KeyC': toggleCatalog(); break;
+      case 'Escape':
+        if (!document.getElementById('catalog-overlay').hidden) toggleCatalog(false);
+        else { followTarget = null; updateFollowBtn(); }
+        break;
+    }
   });
 }
 
@@ -389,14 +696,23 @@ function togglePlay() {
   playing = !playing;
   const b = document.getElementById('play-btn');
   b.textContent = playing ? '⏸ PAUSE' : '▶ PLAY';
-  b.classList.toggle('active', !playing);
+  b.classList.toggle('paused', !playing);
 }
 
 function handleClick(sx, sy) {
   const f = frames[frameIdx];
+  // ship first
+  const sp = worldToScreen(f.shipPos[0], f.shipPos[1]);
+  if (Math.hypot(sx - sp.x, sy - sp.y) < 14) { toggleFollowShip(); return; }
   for (let i = 0; i < bodyNames.length; i++) {
     const { x, y } = worldToScreen(f.positions[i][0], f.positions[i][1]);
-    if (Math.hypot(sx - x, sy - y) < styleOf(i).r + 8) { followBody = (followBody === i) ? -1 : i; return; }
+    if (Math.hypot(sx - x, sy - y) < styleOf(i).r + 8) {
+      followTarget = (followTarget && followTarget.type === 'body' && followTarget.idx === i)
+        ? null : { type: 'body', idx: i };
+      updateFollowBtn();
+      return;
+    }
   }
-  followBody = -1;
+  followTarget = null;
+  updateFollowBtn();
 }

@@ -10,6 +10,7 @@
     { "from": "Ceres", "to": "Saturn",  "note": "Canterbury ice run - The Expanse S1E1 'Dulcinea'" },
     { "from": "Earth", "to": "Mars",    "note": "Canonical reference run" },
     { "from": "Mars",  "to": "Ceres",   "note": "Inner Belt logistics" },
+    { "from": "Earth", "to": "Ceres",   "note": "Inner planets to the Belt - the Belter run" },
     { "from": "Earth", "to": "Jupiter", "note": "Long-haul outer system" }
   ]
 }

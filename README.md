@@ -8,7 +8,8 @@ SciFi Night talk on *The Expanse* to answer one question on stage:
 
 Pick a route and a drive, watch the ship fly, and read the numbers. The drama is
 the contrast: a trip that takes a chemical rocket *years* takes an Epstein-drive
-ship *days*.
+ship *days* — and the **same-clock race strip** at the bottom of the screen shows
+the chemical baseline crawling while the Epstein ship arrives.
 
 - **Earth → Mars:** 259 days by chemical rocket → **~4 days at 1 g** (≈64× faster)
 - **Ceres → Saturn** (the *Canterbury*'s ice run, S1E1 "Dulcinea"): **~7.7 years → ~8 days** (≈349× faster)
@@ -33,6 +34,25 @@ ship *days*.
 
 See **[docs/PHYSICS.md](docs/PHYSICS.md)** for the equations, the approximations,
 and the full numbers table — the presenter cheat sheet.
+
+## Visualizer features
+
+- **Mission picker** — any route × any drive, one click (or press **C** for the
+  full catalog overlay and click a row to fly it).
+- **Numbers panel** — transit time, peak velocity, accel, Δv, and the big
+  **"N× faster"** badge, all straight from the Lean-computed JSON.
+- **Live telemetry** — current velocity (and **% of light speed**), distance
+  traveled / remaining, updated every frame from the trajectory data.
+- **Same-clock race strip** — Epstein ship vs. chemical rocket progress bars on
+  one shared clock; the chemical bar barely moves. The talk in one widget.
+- **Real trajectory rendering** — orbit guides for every planet, the flown path
+  colored by drive phase (accel / flip / decel / coast), a dashed preview of the
+  path ahead, flip-point and intercept markers, and a flickering drive plume.
+- **Phase timeline** — the scrub bar is underlaid with the burn structure, so
+  you can see the flip at mid-transit before you scrub to it.
+- **Camera** — scroll to zoom, drag to pan, click a planet (or the ship) to
+  follow it, **F** to follow the ship, **R** to re-fit, **Space** to pause,
+  **←/→** to single-step frames (Shift for ×10).
 
 ## Quick start
 
@@ -92,6 +112,7 @@ Default catalog (printed every run):
 |---|---|---|---|
 | Earth → Mars | 259 days (Δv 5.6 km/s) | ~4 days, ~64× | ~2 days, ~110× |
 | Mars → Ceres | ~1.6 years | ~5 days, ~108× | ~3 days |
+| Earth → Ceres | ~1.3 years (Δv 11.2 km/s) | ~3 days, ~124× | ~2 days |
 | Earth → Jupiter | ~2.7 years | ~6 days, ~158× | ~3 days |
 | Ceres → Saturn | ~7.7 years | ~8 days, ~349× | ~4 days |
 
@@ -104,8 +125,10 @@ lake exe tests             # 38 Lean assertions: brachistochrone, intercept solv
                            #   Hohmann 259d/574d/7.7yr, Δv, Kepler, JSON parser,
                            #   missions/speed-up, export round-trip, RK4 energy conservation
 npm install                # @playwright/test
-npx playwright test        # 11 tests: picker populated, numbers-match-JSON,
-                           #   chemical-vs-Epstein, ship animation, phase indicator, controls
+npx playwright test        # 18 tests: picker populated, numbers-match-JSON,
+                           #   chemical-vs-Epstein, ship animation, phase indicator, controls,
+                           #   telemetry-matches-frames, race strip, catalog overlay,
+                           #   keyboard shortcuts, phase timeline, screenshot review
 ```
 
 ## Code map

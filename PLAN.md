@@ -48,10 +48,21 @@ assertions (`lake exe tests`) and Playwright (`npx playwright test`).
 
 ---
 
-## Status: ✅ 38 Lean tests + 11 Playwright tests green; catalog generates in <1 s.
+## Phase 7 — Presentation revamp  ✅
+- [x] Earth→Ceres "Belter run" route (5 routes × 4 drives = 20 missions)
+- [x] Orbit guides for every planet; phase-colored flown path + dashed future path
+- [x] Flip-point + intercept markers; drive plume; label de-overlap
+- [x] Live telemetry: current velocity, **% of light speed**, distance traveled/remaining
+- [x] **Same-clock race strip** (chemical vs Epstein on one clock) — was a stretch goal
+- [x] Catalog overlay (press **C**) — the full numbers table in-app, click a row to fly it
+- [x] Keyboard shortcuts (Space, ←/→, F follow ship, R reset view, C catalog)
+- [x] Phase timeline under the scrub bar; parallax + twinkle starfield; vignette
+- [x] Frame-rate-independent playback; scrub no longer fights the animation loop
+- [x] 7 new Playwright tests (18 total), incl. telemetry-vs-frames cross-check
+
+## Status: ✅ 38 Lean tests + 18 Playwright tests green; catalog generates in <1 s.
 
 ## Stretch (post-talk)
 - Keplerian eccentricity/inclination for planet rendering
-- Side-by-side "race" overlay (chemical vs Epstein on one clock)
 - Round-trip missions; Lagrange points / Trojans
 - Relativistic correction note for the highest-g burns

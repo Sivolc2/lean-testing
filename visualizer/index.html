@@ -10,6 +10,7 @@
 
 <div id="canvas-container">
   <canvas id="simCanvas"></canvas>
+  <div id="vignette"></div>
 
   <div id="hud">
 
@@ -20,7 +21,10 @@
       <span id="time-display">T+0d</span>
       <span id="eta-display"></span>
       <span class="hud-separator">|</span>
-      <button id="play-btn" class="hud-btn">⏸ PAUSE</button>
+      <button id="play-btn" class="hud-btn" title="Space">⏸ PAUSE</button>
+      <button id="follow-btn" class="hud-btn" title="F — keep the camera on the ship">◎ FOLLOW SHIP</button>
+      <button id="reset-view-btn" class="hud-btn" title="R — re-fit the view">⌖ RESET VIEW</button>
+      <button id="catalog-btn" class="hud-btn" title="C — full numbers table">☰ CATALOG</button>
       <div id="speed-control">
         <span class="dim">SPD</span>
         <input type="range" id="speed-slider" min="0" max="100" value="40" step="1">
@@ -60,17 +64,53 @@
         <div class="np-speedup-sub">vs. chemical (Hohmann)</div>
       </div>
       <div id="np-baseline-note">Chemical baseline — today's tech</div>
+
+      <div class="picker-label telemetry-head">LIVE TELEMETRY</div>
+      <div class="np-row"><span class="np-key">VELOCITY NOW</span><span class="np-val np-live" id="np-curv">—</span></div>
+      <div class="np-row"><span class="np-key">LIGHT SPEED</span><span class="np-val np-live" id="np-lightc">—</span></div>
+      <div class="np-row"><span class="np-key">TRAVELED</span><span class="np-val np-live" id="np-dist">—</span></div>
+      <div class="np-row"><span class="np-key">REMAINING</span><span class="np-val np-live" id="np-remain">—</span></div>
     </div>
 
-    <!-- Bottom bar: scrub -->
+    <!-- Bottom bar: race strip + scrub -->
     <div id="bottom-bar">
+      <div id="race-strip">
+        <div class="race-row">
+          <span class="race-name" id="race-ship-name">THIS SHIP</span>
+          <div class="race-track"><div class="race-fill race-fill-ep" id="race-ep-fill"></div></div>
+          <span class="race-pct" id="race-ep-pct">0%</span>
+        </div>
+        <div class="race-row">
+          <span class="race-name">CHEMICAL ROCKET</span>
+          <div class="race-track"><div class="race-fill race-fill-chem" id="race-chem-fill"></div></div>
+          <span class="race-pct" id="race-chem-pct">0%</span>
+        </div>
+      </div>
       <div id="scrub-container">
         <span class="dim">TIME</span>
-        <input type="range" id="scrub-slider" min="0" max="240" value="0" step="1">
+        <div id="scrub-stack">
+          <div id="phase-strip"></div>
+          <input type="range" id="scrub-slider" min="0" max="240" value="0" step="1">
+        </div>
+        <span id="key-hints" class="dim">SPACE play · ←→ scrub · F follow · R reset · C catalog</span>
       </div>
     </div>
 
   </div><!-- #hud -->
+
+  <!-- Catalog overlay (presenter cheat sheet) -->
+  <div id="catalog-overlay" hidden>
+    <div id="catalog-panel">
+      <div id="catalog-title">TRANSIT CATALOG <span class="dim">— every route × drive, computed in Lean</span></div>
+      <table id="catalog-table">
+        <thead>
+          <tr><th>ROUTE</th><th>DRIVE</th><th>TRANSIT</th><th>PEAK VEL</th><th>ACCEL / Δv</th><th>VS CHEMICAL</th></tr>
+        </thead>
+        <tbody id="catalog-body"></tbody>
+      </table>
+      <div id="catalog-hint" class="dim">click a row to fly it · C or ESC to close</div>
+    </div>
+  </div>
 
   <div id="loading">LOADING TRANSIT CATALOG<div id="loading-bar"></div></div>
 

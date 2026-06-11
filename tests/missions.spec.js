@@ -183,3 +183,147 @@ test.describe('Epstein-drive transit visualizer', () => {
   });
 
 });
+
+test.describe('Revamp features', () => {
+
+  test('12. Earth→Ceres Belter route is in the picker', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await expect(page.locator('.route-btn[data-route="Earth→Ceres"]')).toBeVisible();
+    const n = await page.locator('.route-btn').count();
+    expect(n).toBeGreaterThanOrEqual(5);
+  });
+
+  test('13. live telemetry matches a finite-difference of the frames', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await page.locator('.route-btn[data-route="Earth→Mars"]').click();
+    await page.locator('.drive-btn[data-drive="ep1"]').click();
+    await page.locator('#play-btn').click(); // pause
+    // scrub to mid-flight
+    await page.locator('#scrub-slider').evaluate(el => {
+      el.value = Math.floor(el.max / 2); el.dispatchEvent(new Event('input'));
+    });
+    await page.waitForTimeout(150);
+
+    const { expected, shown } = await page.evaluate(() => {
+      const fs = window._sim.mission.frames;
+      const i = parseInt(document.getElementById('scrub-slider').value);
+      const j0 = Math.max(0, i - 1), j1 = Math.min(fs.length - 1, i + 1);
+      const a = fs[j0].shipPos, b = fs[j1].shipPos;
+      const v = Math.hypot(b[0] - a[0], b[1] - a[1]) / (fs[j1].t - fs[j0].t) / 1000;
+      return { expected: v, shown: window._sim.telemetry.velKms };
+    });
+    expect(shown).toBeCloseTo(expected, 3);
+
+    // displayed text agrees with the telemetry object
+    const curvText = await page.locator('#np-curv').textContent();
+    expect(curvText).toContain('km/s');
+    expect(parseFloat(curvText.replace(/,/g, ''))).toBeCloseTo(expected, 0);
+    // mid-burn at 1 g a ship is going a meaningful fraction of c
+    await expect(page.locator('#np-lightc')).toContainText('% c');
+    await expect(page.locator('#np-dist')).toContainText('AU');
+    await expect(page.locator('#np-remain')).toContainText('AU');
+  });
+
+  test('14. race strip shows for Epstein, hides for chemical, and Epstein leads', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await page.locator('.route-btn[data-route="Ceres→Saturn"]').click();
+    await page.locator('.drive-btn[data-drive="ep1"]').click();
+    await page.waitForTimeout(800); // let it fly a bit
+    await expect(page.locator('#race-strip')).toBeVisible();
+
+    const widths = await page.evaluate(() => ({
+      ep: parseFloat(document.getElementById('race-ep-fill').style.width),
+      chem: parseFloat(document.getElementById('race-chem-fill').style.width),
+    }));
+    expect(widths.ep).toBeGreaterThan(0);
+    expect(widths.ep).toBeGreaterThan(widths.chem); // the whole point of the talk
+    await expect(page.locator('#race-chem-pct')).toContainText('of');
+
+    await page.locator('.drive-btn[data-drive="chem"]').click();
+    await expect(page.locator('#race-strip')).toBeHidden();
+  });
+
+  test('15. catalog overlay lists every mission and selects on click', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await page.locator('#catalog-btn').click();
+    await expect(page.locator('#catalog-overlay')).toBeVisible();
+
+    const counts = await page.evaluate(() => ({
+      rows: document.querySelectorAll('#catalog-body tr[data-mission-id]').length,
+      heads: document.querySelectorAll('#catalog-body tr.route-head').length,
+      missions: window._sim.data.missions.length,
+      routes: new Set(window._sim.data.missions.map(m => m.from + '→' + m.to)).size,
+    }));
+    expect(counts.rows).toBe(counts.missions);
+    expect(counts.heads).toBe(counts.routes);
+
+    // current mission row is highlighted
+    const current = await page.locator('#catalog-body tr.current').getAttribute('data-mission-id');
+    expect(current).toBe(await page.evaluate(() => window._sim.mission.id));
+
+    // clicking a row flies that mission and closes the overlay
+    await page.locator('#catalog-body tr[data-mission-id="Earth-Jupiter-ep3"]').click();
+    await expect(page.locator('#catalog-overlay')).toBeHidden();
+    expect(await page.evaluate(() => window._sim.mission.id)).toBe('Earth-Jupiter-ep3');
+    await expect(page.locator('#np-route')).toHaveText('Earth → Jupiter');
+  });
+
+  test('16. keyboard shortcuts: space, C/Escape, F follow, arrow scrub', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+
+    // space toggles play
+    await page.keyboard.press('Space');
+    await expect(page.locator('#play-btn')).toContainText('PLAY');
+    await page.keyboard.press('Space');
+    await expect(page.locator('#play-btn')).toContainText('PAUSE');
+
+    // C opens the catalog, Escape closes it
+    await page.keyboard.press('c');
+    await expect(page.locator('#catalog-overlay')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#catalog-overlay')).toBeHidden();
+
+    // F toggles follow-ship
+    await page.keyboard.press('f');
+    await expect(page.locator('#follow-btn')).toHaveClass(/active/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#follow-btn')).not.toHaveClass(/active/);
+
+    // arrow keys pause and step the frame
+    const v0 = await page.evaluate(() => parseInt(document.getElementById('scrub-slider').value));
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#play-btn')).toContainText('PLAY'); // paused by arrow
+    const v1 = await page.evaluate(() => parseInt(document.getElementById('scrub-slider').value));
+    expect(v1).toBe((v0 + 1) % 241);
+  });
+
+  test('17. phase strip renders the burn timeline as a gradient', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await page.locator('.drive-btn[data-drive="ep1"]').click();
+    const bg = await page.locator('#phase-strip').evaluate(el => el.style.background);
+    expect(bg).toContain('linear-gradient');
+    // Epstein timeline contains both the accel and decel colors
+    expect(bg).toContain('255, 176, 96');  // #ffb060 accel
+    expect(bg).toContain('102, 192, 255'); // #66c0ff decel
+  });
+
+  test('18. screenshots: chemical transfer and catalog overlay', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+    await page.locator('.route-btn[data-route="Earth→Mars"]').click();
+    await page.locator('.drive-btn[data-drive="chem"]').click();
+    await page.locator('#play-btn').click(); // pause
+    await page.locator('#scrub-slider').evaluate(el => {
+      el.value = Math.floor(el.max * 0.55); el.dispatchEvent(new Event('input'));
+    });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(__dirname, 'screenshot-chemical.png') });
+
+    await page.locator('#catalog-btn').click();
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(__dirname, 'screenshot-catalog.png') });
+    expect(fs.existsSync(path.join(__dirname, 'screenshot-chemical.png'))).toBe(true);
+    expect(fs.existsSync(path.join(__dirname, 'screenshot-catalog.png'))).toBe(true);
+  });
+
+});
