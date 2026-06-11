@@ -44,8 +44,13 @@
         <div id="drive-list"></div>
       </div>
       <div id="phase-box">
-        <span class="picker-label">DRIVE PHASE</span>
+        <span class="picker-label tip" data-tip="An Epstein ship burns the whole trip: accelerate to the midpoint, flip 180°, decelerate the rest of the way (the 'flip and burn'). A chemical ship burns for minutes, then coasts on an ellipse.">DRIVE PHASE</span>
         <div id="phase-indicator">—</div>
+      </div>
+
+      <div id="physics-box">
+        <span class="picker-label tip" data-tip="The governing equations with this mission's actual inputs. Hover any term to learn what it means. Everything is computed in Lean; this panel just shows its work.">THE MATH</span>
+        <div id="physics-eqs"></div>
       </div>
     </div>
 
@@ -54,10 +59,10 @@
       <h3 id="np-route">— → —</h3>
       <div id="np-drive" class="np-drive">—</div>
 
-      <div class="np-row"><span class="np-key">TRANSIT TIME</span><span class="np-val" id="np-transit">—</span></div>
-      <div class="np-row"><span class="np-key">PEAK VELOCITY</span><span class="np-val" id="np-peakv">—</span></div>
-      <div class="np-row"><span class="np-key">DRIVE ACCEL</span><span class="np-val" id="np-accel">—</span></div>
-      <div class="np-row"><span class="np-key">Δv BUDGET</span><span class="np-val" id="np-dv">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Total trip time, departure to intercept. Epstein: t = 2·√(d/a). Chemical: half the orbital period of the Hohmann transfer ellipse.">TRANSIT TIME</span><span class="np-val" id="np-transit">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Fastest speed of the trip relative to the Sun — reached at the flip point for an Epstein burn, or at the ellipse's closest point to the Sun for a chemical transfer.">PEAK VELOCITY</span><span class="np-val" id="np-peakv">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Constant thrust acceleration, in Earth gravities. This is also the artificial gravity the crew feels — floor toward the engines. 'Impulsive' means short burns and a long unpowered coast.">DRIVE ACCEL</span><span class="np-val" id="np-accel">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Total velocity change the engine must supply for the transfer's burns. Chemical fuel grows exponentially with Δv (the rocket equation), which is why these trips hug the minimum. An Epstein drive's effective Δv is thousands of km/s.">Δv BUDGET</span><span class="np-val" id="np-dv">—</span></div>
 
       <div id="np-speedup-box">
         <div id="np-speedup">—</div>
@@ -66,10 +71,10 @@
       <div id="np-baseline-note">Chemical baseline — today's tech</div>
 
       <div class="picker-label telemetry-head">LIVE TELEMETRY</div>
-      <div class="np-row"><span class="np-key">VELOCITY NOW</span><span class="np-val np-live" id="np-curv">—</span></div>
-      <div class="np-row"><span class="np-key">LIGHT SPEED</span><span class="np-val np-live" id="np-lightc">—</span></div>
-      <div class="np-row"><span class="np-key">TRAVELED</span><span class="np-val np-live" id="np-dist">—</span></div>
-      <div class="np-row"><span class="np-key">REMAINING</span><span class="np-val np-live" id="np-remain">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="The ship's current speed relative to the Sun, measured from the simulated trajectory itself (finite difference of adjacent frames).">VELOCITY NOW</span><span class="np-val np-live" id="np-curv">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Current speed as a fraction of c = 299,792 km/s. A 3 g hard burn tops ~1.9% of light speed — fast enough that relativity starts to whisper, though this sim stays classical.">LIGHT SPEED</span><span class="np-val np-live" id="np-lightc">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Distance flown along the trajectory so far. 1 AU = the Earth–Sun distance ≈ 150 million km.">TRAVELED</span><span class="np-val np-live" id="np-dist">—</span></div>
+      <div class="np-row"><span class="np-key tip" data-tip="Trajectory distance still to fly before the intercept point.">REMAINING</span><span class="np-val np-live" id="np-remain">—</span></div>
     </div>
 
     <!-- Bottom bar: race strip + scrub -->

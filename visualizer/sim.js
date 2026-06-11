@@ -4,6 +4,8 @@
 const AU = 1.495978707e11;
 const SEC_PER_DAY = 86400;
 const C_KMS = 299792.458;          // speed of light, km/s
+const GM_SUN = 1.32712440018e20;   // Sun's gravitational parameter μ, m³/s²
+const G_EARTH = 9.80665;           // m/s² per "g"
 
 // Visual config keyed by body name (data drives the rest).
 const BODY_STYLE = {
@@ -177,6 +179,7 @@ function selectMission(m) {
   updateRaceLabels();
   autoFit();
   updateNumbers();
+  updatePhysicsPanel();
 }
 
 function highlightPickers() {
@@ -509,6 +512,87 @@ function updateNumbers() {
     peakVelKms: m.peakVelKms, accelG: m.accelG, isHohmann: m.isHohmann,
     deltaVKms: m.deltaVKms, speedupFactor: m.speedupFactor,
   };
+}
+
+// ── "The math" panel ─────────────────────────────────────────────────────────
+function eqRow(lhs, val, tip, kind) {
+  const row = document.createElement('div');
+  row.className = 'eq-row ' + (kind || 'eq-sub');
+  const l = document.createElement('span');
+  l.className = 'eq-lhs' + (tip ? ' tip tip-above' : '');
+  if (tip) l.setAttribute('data-tip', tip);
+  l.textContent = lhs;
+  const v = document.createElement('span');
+  v.className = 'eq-val';
+  v.textContent = val;
+  row.append(l, v);
+  return row;
+}
+
+function eqTitle(text) {
+  const el = document.createElement('div');
+  el.className = 'eq-title';
+  el.textContent = text;
+  return el;
+}
+
+// Rebuild the equations panel from the selected mission's actual inputs, so
+// the audience can see exactly which numbers produce the headline result.
+function updatePhysicsPanel() {
+  const box = document.getElementById('physics-eqs');
+  box.innerHTML = '';
+  const m = mission;
+
+  if (!m.isHohmann) {
+    const a = m.accelG * G_EARTH;
+    const dep = frames[0].shipPos, arr = frames[frames.length - 1].shipPos;
+    const d = Math.hypot(arr[0] - dep[0], arr[1] - dep[1]);   // straight-line burn
+    const tDays = 2 * Math.sqrt(d / a) / SEC_PER_DAY;
+    const vPk = Math.sqrt(a * d) / 1000;
+    const sunG = GM_SUN / (AU * AU);                          // Sun's pull at 1 AU
+    const ratio = a / sunG;
+
+    box.append(
+      eqTitle('FLIP-AND-BURN (BRACHISTOCHRONE)'),
+      eqRow('t = 2·√(d/a)', fmtTime(tDays),
+        'Accelerate over the first half of d, decelerate over the second. Time grows with the square root of distance — 4× farther is only 2× longer, which is why the outer planets stop being remote.',
+        'eq-main'),
+      eqRow('v_pk = √(a·d)', Math.round(vPk).toLocaleString() + ' km/s',
+        'Peak speed, reached at the flip point in the middle of the trip. Longer trips mean higher peaks — distance buys speed.',
+        'eq-main'),
+      eqRow('d', (d / AU).toFixed(2) + ' AU',
+        'Straight-line distance to the intercept point — where ' + m.to + ' WILL be on arrival day, not where it is now. The sim solves for that lead like a hunter aiming ahead of a duck.'),
+      eqRow('a', a.toFixed(2) + ' m/s²  (' + m.accelG + ' g)',
+        'Constant proper acceleration, the drive’s one defining number. It doubles as the crew’s artificial gravity: burn at 1 g and the deck feels like Earth.'),
+      eqRow('a / g_sun(1 AU)', '≈ ' + Math.round(ratio).toLocaleString() + '×',
+        'The drive’s acceleration vs. the Sun’s pull at Earth’s distance (' + sunG.toFixed(4) + ' m/s²). The drive dominates so completely that the trajectory is effectively a straight line — gravity is a rounding error.'),
+    );
+    window._sim.physics = { model: 'brachistochrone', tDays, dAU: d / AU, aMs2: a, vPkKms: vPk, sunRatio: ratio };
+  } else {
+    const r1 = data.bodies.find(b => b.name === m.from).aAU;
+    const r2 = data.bodies.find(b => b.name === m.to).aAU;
+    const aT = (r1 + r2) / 2;
+    const tDays = Math.PI * Math.sqrt(Math.pow(aT * AU, 3) / GM_SUN) / SEC_PER_DAY;
+
+    box.append(
+      eqTitle('HOHMANN TRANSFER (HALF-ELLIPSE)'),
+      eqRow('t = π·√(aₜ³/μ)', fmtTime(tDays),
+        'Half the orbital period of the transfer ellipse — Kepler’s third law. No engine running, no shortcuts: the Sun’s gravity alone sets the schedule.',
+        'eq-main'),
+      eqRow('aₜ = (r₁+r₂)/2', aT.toFixed(2) + ' AU',
+        'Semi-major axis of the transfer ellipse, which just kisses the departure orbit on one end and the arrival orbit on the other. Bigger ellipse, longer period, slower trip.',
+        'eq-main'),
+      eqRow('r₁  (' + m.from + ')', r1.toFixed(2) + ' AU',
+        'Radius of the departure orbit. 1 AU = the Earth–Sun distance ≈ 150 million km.'),
+      eqRow('r₂  (' + m.to + ')', r2.toFixed(2) + ' AU',
+        'Radius of the destination orbit. The transfer only connects when the planets line up — miss the launch window and you wait months or years for the next one.'),
+      eqRow('μ = GM_sun', '1.327e20 m³/s²',
+        'The Sun’s gravitational parameter: its mass times the gravitational constant. The only physical constant in the transit-time formula — everything else is geometry.'),
+      eqRow('Δv (vis-viva)', m.deltaVKms.toFixed(2) + ' km/s',
+        'Two impulsive burns: one to stretch the circular orbit into the ellipse, one to circularize on arrival, each sized by the vis-viva equation. Fuel cost grows exponentially with Δv, so chemical missions fight for every m/s.'),
+    );
+    window._sim.physics = { model: 'hohmann', tDays, aT_AU: aT, r1AU: r1, r2AU: r2, dvKms: m.deltaVKms };
+  }
 }
 
 function updateTelemetry() {

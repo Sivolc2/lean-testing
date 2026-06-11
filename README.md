@@ -43,6 +43,12 @@ and the full numbers table — the presenter cheat sheet.
   **"N× faster"** badge, all straight from the Lean-computed JSON.
 - **Live telemetry** — current velocity (and **% of light speed**), distance
   traveled / remaining, updated every frame from the trajectory data.
+- **"The math" panel** — the governing equations with the selected mission's
+  actual inputs (`t = 2·√(d/a)` with this trip's `d` and `a`; Kepler's third law
+  with this transfer's `aₜ`, `r₁`, `r₂`, `μ`), so the audience can see exactly
+  which numbers produce the headline result.
+- **Help tooltips** — hover any dotted-underlined term (equation symbols, panel
+  labels) for a plain-language explanation of what it means and why it matters.
 - **Same-clock race strip** — Epstein ship vs. chemical rocket progress bars on
   one shared clock; the chemical bar barely moves. The talk in one widget.
 - **Real trajectory rendering** — orbit guides for every planet, the flown path
@@ -125,10 +131,11 @@ lake exe tests             # 38 Lean assertions: brachistochrone, intercept solv
                            #   Hohmann 259d/574d/7.7yr, Δv, Kepler, JSON parser,
                            #   missions/speed-up, export round-trip, RK4 energy conservation
 npm install                # @playwright/test
-npx playwright test        # 18 tests: picker populated, numbers-match-JSON,
+npx playwright test        # 20 tests: picker populated, numbers-match-JSON,
                            #   chemical-vs-Epstein, ship animation, phase indicator, controls,
                            #   telemetry-matches-frames, race strip, catalog overlay,
-                           #   keyboard shortcuts, phase timeline, screenshot review
+                           #   keyboard shortcuts, phase timeline, math-panel-reproduces-Lean,
+                           #   tooltips, screenshot review
 ```
 
 ## Code map

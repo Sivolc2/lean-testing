@@ -326,4 +326,53 @@ test.describe('Revamp features', () => {
     expect(fs.existsSync(path.join(__dirname, 'screenshot-catalog.png'))).toBe(true);
   });
 
+  test('19. math panel shows the right equations and they reproduce the Lean result', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+
+    // Epstein: brachistochrone form, and t = 2·√(d/a) matches the mission's transit
+    await page.locator('.route-btn[data-route="Earth→Mars"]').click();
+    await page.locator('.drive-btn[data-drive="ep1"]').click();
+    await expect(page.locator('#physics-eqs')).toContainText('BRACHISTOCHRONE');
+    await expect(page.locator('#physics-eqs')).toContainText('t = 2·√(d/a)');
+    await expect(page.locator('#physics-eqs')).toContainText('g_sun');
+    let phys = await page.evaluate(() => ({ p: window._sim.physics, m: window._sim.mission }));
+    expect(phys.p.model).toBe('brachistochrone');
+    expect(phys.p.tDays).toBeCloseTo(phys.m.transitDays, 1);
+    expect(phys.p.vPkKms).toBeCloseTo(phys.m.peakVelKms, 0);
+
+    // Chemical: Hohmann form, Kepler-3 transit time matches, radii come from the data
+    await page.locator('.drive-btn[data-drive="chem"]').click();
+    await expect(page.locator('#physics-eqs')).toContainText('HOHMANN');
+    await expect(page.locator('#physics-eqs')).toContainText('t = π·√(aₜ³/μ)');
+    await expect(page.locator('#physics-eqs')).toContainText('Δv');
+    phys = await page.evaluate(() => ({ p: window._sim.physics, m: window._sim.mission, bodies: window._sim.data.bodies }));
+    expect(phys.p.model).toBe('hohmann');
+    expect(phys.p.tDays).toBeCloseTo(phys.m.transitDays, 0);
+    expect(phys.p.aT_AU).toBeCloseTo((phys.p.r1AU + phys.p.r2AU) / 2, 6);
+  });
+
+  test('20. help tooltips exist and appear on hover', async ({ page }) => {
+    await page.goto(URL); await waitLoaded(page);
+
+    // every tooltip term has a real explanation
+    const tips = await page.evaluate(() =>
+      [...document.querySelectorAll('.tip')].map(el => el.getAttribute('data-tip') || ''));
+    expect(tips.length).toBeGreaterThanOrEqual(12); // numbers panel + math panel + labels
+    for (const t of tips) expect(t.length).toBeGreaterThan(30);
+
+    // hidden until hover, visible on hover (CSS ::after)
+    const term = page.locator('#numbers-panel .np-key.tip').first();
+    const before = await term.evaluate(el => getComputedStyle(el, '::after').visibility);
+    expect(before).toBe('hidden');
+    await term.hover();
+    await page.waitForTimeout(300); // transition
+    const after = await term.evaluate(el => getComputedStyle(el, '::after').visibility);
+    expect(after).toBe('visible');
+
+    // screenshot with a math-panel tooltip showing, for visual review
+    await page.locator('#physics-eqs .tip').first().hover();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(__dirname, 'screenshot-tooltip.png') });
+  });
+
 });

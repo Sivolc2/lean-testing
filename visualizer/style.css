@@ -15,7 +15,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #01030a; }
   position: absolute; inset: 0; pointer-events: none;
   font-family: "Courier New", Courier, monospace; color: #9fd8c8;
 }
-#hud button, #hud input, #hud .pick-btn { pointer-events: auto; }
+#hud button, #hud input, #hud .pick-btn, #hud .tip { pointer-events: auto; }
+#numbers-panel { pointer-events: auto; }
 
 .dim { color: #557066; font-size: 11px; }
 .hud-separator { color: #2c4a40; margin: 0 4px; }
@@ -48,9 +49,26 @@ input[type=range] { -webkit-appearance: none; height: 4px; background: #1c3a30; 
 input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #6fe0c0; border-radius: 50%; cursor: pointer; box-shadow: 0 0 6px #6fe0c088; }
 #speed-slider { width: 110px; }
 
+/* Help tooltips — hover any dotted-underlined term */
+.tip { cursor: help; border-bottom: 1px dotted #3a7a64; position: relative; }
+.tip::after {
+  content: attr(data-tip);
+  position: absolute; left: 0; top: calc(100% + 7px);
+  width: 240px; padding: 8px 10px;
+  background: #06211a; border: 1px solid #2a5a4a; border-radius: 4px;
+  color: #cfeee2; font-size: 11px; line-height: 1.5;
+  letter-spacing: 0.2px; text-transform: none; white-space: normal;
+  font-family: "Courier New", Courier, monospace; font-weight: normal;
+  opacity: 0; visibility: hidden; transition: opacity .12s ease .05s;
+  z-index: 30; pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+}
+.tip:hover::after { opacity: 1; visibility: visible; }
+.tip-above::after { top: auto; bottom: calc(100% + 7px); }
+
 /* Picker panel (left) */
 #picker-panel {
-  position: absolute; top: 56px; left: 14px; width: 216px;
+  position: absolute; top: 56px; left: 14px; width: 238px;
   background: rgba(3,16,13,0.88); border: 1px solid #1c3a30; border-radius: 4px;
   padding: 12px; pointer-events: auto;
   box-shadow: 0 4px 24px rgba(0,0,0,0.5);
@@ -71,6 +89,17 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px;
 .pick-btn.active { background: #12352a; color: #6fe0c0; border-color: #4fbf9c; box-shadow: 0 0 8px #2a6a5644; }
 
 #phase-box { margin-top: 14px; border-top: 1px solid #1c3a30; padding-top: 10px; }
+
+/* "The math" panel — live equations + inputs for the selected mission */
+#physics-box { margin-top: 14px; border-top: 1px solid #1c3a30; padding-top: 10px; }
+#physics-eqs { display: flex; flex-direction: column; margin-top: 7px; }
+.eq-title { color: #7fd8c0; font-size: 10.5px; letter-spacing: 1px; margin-bottom: 5px; }
+.eq-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 3px 0; }
+.eq-row.eq-main { border-bottom: 1px solid #12281f; }
+.eq-row.eq-sub .eq-lhs { padding-left: 12px; color: #6f9a8c; }
+.eq-lhs { color: #9fd8c8; font-size: 12.5px; white-space: nowrap; }
+.eq-val { color: #ffd966; font-size: 12.5px; text-align: right; font-variant-numeric: tabular-nums; }
+.eq-row.eq-sub .eq-val { color: #cfeee2; font-size: 12px; }
 #phase-indicator { margin-top: 5px; font-size: 14px; letter-spacing: 1px; color: #7fb8a8; }
 .phase-accel { color: #ffb060 !important; text-shadow: 0 0 10px #ff8c0055; }
 .phase-flip  { color: #ff66cc !important; text-shadow: 0 0 10px #ff66cc55; }

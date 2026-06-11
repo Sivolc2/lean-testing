@@ -60,7 +60,14 @@ assertions (`lake exe tests`) and Playwright (`npx playwright test`).
 - [x] Frame-rate-independent playback; scrub no longer fights the animation loop
 - [x] 7 new Playwright tests (18 total), incl. telemetry-vs-frames cross-check
 
-## Status: ✅ 38 Lean tests + 18 Playwright tests green; catalog generates in <1 s.
+## Phase 8 — Teach the physics  ✅
+- [x] "The math" panel (left side): live equations + this mission's actual inputs
+      (brachistochrone d, a, drive-vs-Sun-gravity ratio; Hohmann aₜ, r₁, r₂, μ, Δv)
+- [x] Help tooltips on equation terms and panel labels (hover any dotted term)
+- [x] Tests: math panel independently reproduces the Lean transit numbers in-browser;
+      tooltips exist, are substantive, and appear on hover (20 Playwright total)
+
+## Status: ✅ 38 Lean tests + 20 Playwright tests green; catalog generates in <1 s.
 
 ## Stretch (post-talk)
 - Keplerian eccentricity/inclination for planet rendering
