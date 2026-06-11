@@ -125,9 +125,19 @@ function buildPickers() {
     const b = document.createElement('button');
     b.className = 'pick-btn drive-btn';
     b.dataset.drive = d.id;
-    b.textContent = d.label;
+    b.innerHTML = '<span class="drive-label">' + d.label + '</span>' +
+                  '<span class="drive-transit" data-drive-id="' + d.id + '"></span>';
     b.addEventListener('click', () => { selDrive = d.id; refreshMissionFromSelection(); });
     dl.appendChild(b);
+  });
+}
+
+function updateDriveTimes() {
+  if (!selRoute) return;
+  const [from, to] = selRoute.split('→');
+  document.querySelectorAll('.drive-transit').forEach(el => {
+    const m = data.missions.find(x => x.from === from && x.to === to && x.driveId === el.dataset.driveId);
+    el.textContent = m ? fmtTime(m.transitDays) : '';
   });
 }
 
@@ -161,6 +171,7 @@ function selectMission(m) {
   scrub.value = 0;
 
   highlightPickers();
+  updateDriveTimes();
   highlightCatalogRow();
   buildPhaseStrip();
   updateRaceLabels();

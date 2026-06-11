@@ -63,7 +63,10 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px;
   background: #08201a; color: #8fc8b8; border: 1px solid #1c3a30;
   padding: 6px 8px; font-family: inherit; font-size: 12px; text-align: left;
   cursor: pointer; border-radius: 2px; transition: all .12s;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
 }
+.drive-label { flex: 1; }
+.drive-transit { color: #4fbf9c; font-size: 11px; white-space: nowrap; opacity: 0.85; }
 .pick-btn:hover { background: #11302666; border-color: #3a7a64; color: #cfeee2; }
 .pick-btn.active { background: #12352a; color: #6fe0c0; border-color: #4fbf9c; box-shadow: 0 0 8px #2a6a5644; }
 
