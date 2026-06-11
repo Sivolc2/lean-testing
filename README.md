@@ -8,7 +8,8 @@ SciFi Night talk on *The Expanse* to answer one question on stage:
 
 Pick a route and a drive, watch the ship fly, and read the numbers. The drama is
 the contrast: a trip that takes a chemical rocket *years* takes an Epstein-drive
-ship *days*.
+ship *days* — and the **same-clock race strip** at the bottom of the screen shows
+the chemical baseline crawling while the Epstein ship arrives.
 
 - **Earth → Mars:** 259 days by chemical rocket → **~4 days at 1 g** (≈64× faster)
 - **Ceres → Saturn** (the *Canterbury*'s ice run, S1E1 "Dulcinea"): **~7.7 years → ~8 days** (≈349× faster)
@@ -31,8 +32,39 @@ ship *days*.
   rendering, with the higher-fidelity N-body core kept as a validated reference.
   Every approximation is documented and test-justified.
 
-See **[docs/PHYSICS.md](docs/PHYSICS.md)** for the equations, the approximations,
-and the full numbers table — the presenter cheat sheet.
+See **[visualizer/docs/PHYSICS.md](visualizer/docs/PHYSICS.md)** for the equations, the approximations,
+and the full numbers table — the presenter cheat sheet. For the deep dives:
+**[visualizer/docs/ORBITAL_MECHANICS.md](visualizer/docs/ORBITAL_MECHANICS.md)** (Hohmann transfers in
+depth, Lagrange points, launch windows, gravity assists) and
+**[visualizer/docs/EPSTEIN_DRIVE.md](visualizer/docs/EPSTEIN_DRIVE.md)** (candidate drive specs —
+exhaust velocity, Isp, terawatt jet power — and how `accelG` flows from
+`config/missions.json` through the Lean code into every pixel the visualizer
+draws).
+
+## Visualizer features
+
+- **Mission picker** — any route × any drive, one click (or press **C** for the
+  full catalog overlay and click a row to fly it).
+- **Numbers panel** — transit time, peak velocity, accel, Δv, and the big
+  **"N× faster"** badge, all straight from the Lean-computed JSON.
+- **Live telemetry** — current velocity (and **% of light speed**), distance
+  traveled / remaining, updated every frame from the trajectory data.
+- **"The math" panel** — the governing equations with the selected mission's
+  actual inputs (`t = 2·√(d/a)` with this trip's `d` and `a`; Kepler's third law
+  with this transfer's `aₜ`, `r₁`, `r₂`, `μ`), so the audience can see exactly
+  which numbers produce the headline result.
+- **Help tooltips** — hover any dotted-underlined term (equation symbols, panel
+  labels) for a plain-language explanation of what it means and why it matters.
+- **Same-clock race strip** — Epstein ship vs. chemical rocket progress bars on
+  one shared clock; the chemical bar barely moves. The talk in one widget.
+- **Real trajectory rendering** — orbit guides for every planet, the flown path
+  colored by drive phase (accel / flip / decel / coast), a dashed preview of the
+  path ahead, flip-point and intercept markers, and a flickering drive plume.
+- **Phase timeline** — the scrub bar is underlaid with the burn structure, so
+  you can see the flip at mid-transit before you scrub to it.
+- **Camera** — scroll to zoom, drag to pan, click a planet (or the ship) to
+  follow it, **F** to follow the ship, **R** to re-fit, **Space** to pause,
+  **←/→** to single-step frames (Shift for ×10).
 
 ## Quick start
 
@@ -46,6 +78,32 @@ lake exe lean-testing      # compute missions → visualizer/trajectory.json (+ 
 # view it
 npx http-server visualizer -p 8080 -c-1   # then open http://localhost:8080
 ```
+
+## Deployment (Vercel)
+
+The visualizer is fully static — `visualizer/` is the whole site
+(`index.html`, `sim.js`, the pre-computed `trajectory.json`, the rendered
+docs at `docs.html`, and a vendored `marked.min.js` so the docs work without
+a CDN). The root `vercel.json` tells Vercel to skip install/build and serve
+`visualizer/` as the output directory, so importing the repo (main branch)
+deploys it as-is.
+
+To ship new missions or drives: edit `config/missions.json`, run
+`lake exe lean-testing` locally to regenerate `visualizer/trajectory.json`,
+commit, and push to `main` — the Lean toolchain never runs on Vercel.
+
+## Presentation flow (SciFi night)
+
+1. **Run the sim** — the page opens on the *Canterbury*'s Ceres→Saturn run at
+   1 g, already playing: flip-and-burn vs. the 7.7-year chemical baseline on
+   the race strip.
+2. **Show the numbers** — the numbers panel (right), live telemetry (% of
+   light speed), and "the math" panel (left) carry the equations; **📖 THE
+   PHYSICS** in the top bar opens the full write-ups (cheat sheet, orbital
+   mechanics/Lagrange points, Epstein drive specs) for context and Q&A.
+3. **Show more missions** — press **C** for the 25-mission catalog overlay
+   and click any row to fly it (the 5 g combat burn is the crowd-pleaser),
+   or use the route × drive picker.
 
 ## How the simulation works
 
@@ -92,6 +150,7 @@ Default catalog (printed every run):
 |---|---|---|---|
 | Earth → Mars | 259 days (Δv 5.6 km/s) | ~4 days, ~64× | ~2 days, ~110× |
 | Mars → Ceres | ~1.6 years | ~5 days, ~108× | ~3 days |
+| Earth → Ceres | ~1.3 years (Δv 11.2 km/s) | ~3 days, ~124× | ~2 days |
 | Earth → Jupiter | ~2.7 years | ~6 days, ~158× | ~3 days |
 | Ceres → Saturn | ~7.7 years | ~8 days, ~349× | ~4 days |
 
@@ -104,8 +163,11 @@ lake exe tests             # 38 Lean assertions: brachistochrone, intercept solv
                            #   Hohmann 259d/574d/7.7yr, Δv, Kepler, JSON parser,
                            #   missions/speed-up, export round-trip, RK4 energy conservation
 npm install                # @playwright/test
-npx playwright test        # 11 tests: picker populated, numbers-match-JSON,
-                           #   chemical-vs-Epstein, ship animation, phase indicator, controls
+npx playwright test        # 22 tests: picker populated, numbers-match-JSON,
+                           #   chemical-vs-Epstein, ship animation, phase indicator, controls,
+                           #   telemetry-matches-frames, race strip, catalog overlay,
+                           #   keyboard shortcuts, phase timeline, math-panel-reproduces-Lean,
+                           #   tooltips, 5g scaling law, docs page, screenshot review
 ```
 
 ## Code map
@@ -118,4 +180,4 @@ npx playwright test        # 11 tests: picker populated, numbers-match-JSON,
 | Mission assembly + export | `LeanTesting/{Mission,Export}.lean`, `Main.lean` |
 | Tests | `Tests.lean` (Lean), `tests/missions.spec.js` (Playwright) |
 | Visualizer | `visualizer/{index.html,sim.js,style.css}` |
-| Presenter notes | `docs/PHYSICS.md` |
+| Presenter notes | `visualizer/docs/PHYSICS.md` |

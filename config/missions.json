@@ -4,12 +4,14 @@
     { "id": "chem", "label": "Chemical (Hohmann)",   "accelG": 0.0 },
     { "id": "ep03", "label": "Epstein 0.3g cruise",   "accelG": 0.3 },
     { "id": "ep1",  "label": "Epstein 1g",            "accelG": 1.0 },
-    { "id": "ep3",  "label": "Epstein 3g hard burn",  "accelG": 3.0 }
+    { "id": "ep3",  "label": "Epstein 3g hard burn",  "accelG": 3.0 },
+    { "id": "ep5",  "label": "Epstein 5g combat burn", "accelG": 5.0 }
   ],
   "routes": [
     { "from": "Ceres", "to": "Saturn",  "note": "Canterbury ice run - The Expanse S1E1 'Dulcinea'" },
     { "from": "Earth", "to": "Mars",    "note": "Canonical reference run" },
     { "from": "Mars",  "to": "Ceres",   "note": "Inner Belt logistics" },
+    { "from": "Earth", "to": "Ceres",   "note": "Inner planets to the Belt - the Belter run" },
     { "from": "Earth", "to": "Jupiter", "note": "Long-haul outer system" }
   ]
 }
